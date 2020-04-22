@@ -1,6 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import './cardTranaction.dart';
+import './cardTransaction.dart';
 import './transaction.dart';
+import './formTransaction.dart';
+import './chart.dart';
+import './emptyTransaction.dart';
 
 void main() => runApp(MyApp());
 
@@ -10,9 +14,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+          primarySwatch: Colors.purple,
+          accentColor: Colors.amber,
+          fontFamily: 'Quicksand'),
+      home: MyHomePage(title: 'Personal Expenses'),
     );
   }
 }
@@ -27,38 +32,131 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final List<Transaction> transactions = [
-    Transaction(
-        id: "trx1", title: "Nike Shoes", amount: 98.34, date: DateTime.now()),
-    Transaction(
-        id: "trx2", title: "Cricket Bat", amount: 38.34, date: DateTime.now()),
-  ];
+  List<Transaction> transactions = [];
+
+  var _showChart = false;
+
+  List<Transaction> get _recentTransaction {
+    return transactions.where((tx) {
+      return tx.date.isAfter(DateTime.now().subtract(Duration(days: 7)));
+    }).toList();
+  }
+
+  void _addTransaction(String newtitle, double newamount, DateTime dateTime) {
+    var rng = new Random();
+
+    var newTx = Transaction(
+        title: newtitle,
+        amount: newamount,
+        id: rng.nextInt(10000).toString(),
+        date: dateTime);
+
+    setState(() {
+      transactions.add(newTx);
+    });
+  }
+
+  void _startAddTransaction(BuildContext ctx) {
+    showModalBottomSheet(
+        context: ctx,
+        builder: (_bctx) {
+          return GestureDetector(
+            child: FormTransaction(_addTransaction),
+            onTap: () {},
+            behavior: HitTestBehavior.opaque,
+          );
+        });
+  }
+
+  void _deleteTransaction(String id) {
+    setState(() {
+      transactions.removeWhere((tx) => tx.id == id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final maxHeight = mediaQuery.size.height - mediaQuery.padding.top;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: () => _startAddTransaction(context),
+          )
+        ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Chart Here ',
-            ),
-            Text(
-              'List View here ',
-            ),
-            CardTranaction(transactions)
-          ],
-        ),
+
+      body: SingleChildScrollView(
+        child: Container(
+            child: mediaQuery.orientation !=
+                    Orientation.landscape // Portrait Mode Code
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                              child: Chart(_recentTransaction),
+                              height:
+                                  (maxHeight - AppBar().preferredSize.height) *
+                                      0.3,
+                            ),
+                      Container(
+                        child: transactions.length == 0
+                            ? EmptyTransaction()
+                            : CardTranaction(transactions, _deleteTransaction),
+                            height: (maxHeight - AppBar().preferredSize.height) *0.7,
+                      )
+                    ],
+                  ) // Portrait Mode Ends
+                // Landscape Mode Start
+                : Column(
+                    children: <Widget>[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                           Text("Show Chart",
+                              style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold)),
+                          Switch(
+                            value: _showChart,
+                            onChanged: (val) {
+                              setState(() {
+                                _showChart = val;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      _showChart
+                          ? Container(
+                              child: Chart(_recentTransaction),
+                              height:
+                                  (maxHeight - AppBar().preferredSize.height) *
+                                      0.7,
+                            )
+                          : Container(
+                            child: transactions.length == 0
+                                ? EmptyTransaction()
+                                : CardTranaction(transactions, _deleteTransaction),
+                                height: (maxHeight - AppBar().preferredSize.height) *
+                                      0.7 ,
+                          )
+                    ],
+                  )), // Landscape Mode Start
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: null,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: mediaQuery.orientation != Orientation.landscape
+          ? FloatingActionButton(
+              onPressed: () => _startAddTransaction(context),
+              tooltip: 'Increment',
+              child: Icon(Icons.add),
+              backgroundColor: Colors.amber,
+            )
+          : Container(), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
